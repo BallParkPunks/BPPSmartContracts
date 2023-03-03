@@ -114,4 +114,8 @@ contract NFT is ERC721A, Ownable, ReentrancyGuard {
     function setALPrice(uint256 _alPrice) external onlyAdmin {
         alPrice = _alPrice;
     }
+
+    function increaseMaxSupply(uint256 _increaseBy) external onlyAdmin {
+        maxSupply += _increaseBy;
+    }
 }

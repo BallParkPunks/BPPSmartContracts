@@ -106,6 +106,15 @@ const keccak256 = require("keccak256");
       expect(await this.nft.connect(this.wl2).mint(1, proof, {value: this.alPrice})).to.emit('Transfer');
     });
 
+    it('allows owner/admin to increase max supply', async function () {
+      const increaseBy = 100
+      const beforeSupply = await this.nft.maxSupply()
+
+      await this.nft.increaseMaxSupply(increaseBy)
+
+      expect(await this.nft.maxSupply()).to.equal(parseInt(beforeSupply) + increaseBy)
+    })
+
   });
 
   describe('Security', async function () {
@@ -139,6 +148,10 @@ const keccak256 = require("keccak256");
 
     it('does not allow non owner/admin to set allow list price', async function () {
       await expect(this.nft.connect(this.addr4).setALPrice(0)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
+    })
+
+    it('does not allow non owner/admin to increase max supply', async function () {
+      await expect(this.nft.connect(this.addr4).increaseMaxSupply(1000)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
     })
   });
 });
