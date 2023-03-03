@@ -1,0 +1,27 @@
+{
+  "name": "bppsmartcontracts",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/BallParkPunks/BPPSmartContracts.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/BallParkPunks/BPPSmartContracts/issues"
+  },
+  "homepage": "https://github.com/BallParkPunks/BPPSmartContracts#readme",
+  "dependencies": {
+    "@nomiclabs/hardhat-waffle": "^2.0.5",
+    "dotenv": "^16.0.3",
+    "hardhat": "^2.13.0"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^2.0.2"
+  }
+}
