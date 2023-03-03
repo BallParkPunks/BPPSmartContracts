@@ -1,5 +1,6 @@
 # BPP Smart Contracts
-```    NFT
+```    
+  NFT
     Deployment
       ✓ deploys correctly
       ✓ initializes state to closed
