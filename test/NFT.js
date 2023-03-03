@@ -55,6 +55,14 @@ const keccak256 = require("keccak256");
       expect(await this.nft.mint(1,[],{value: this.price})).to.emit('Transfer');
     });
 
+    it('enforces correct price in public state', async function () {
+      // value < price case
+      await expect(this.nft.mint(1,[],{value: 0})).to.be.revertedWith("NFT: incorrect amount of ETH sent");
+
+      // value > price case
+      await expect(this.nft.mint(1,[],{value: (parseInt(this.price) * 2).toString()})).to.be.revertedWith("NFT: incorrect amount of ETH sent");
+    })
+
     it('owner can add to whitelist', async function () {
       await this.nft.setALRoot(this.root);
       expect(await this.nft.alRoot()).to.equal(this.root);
@@ -77,6 +85,18 @@ const keccak256 = require("keccak256");
       await this.nft.setState(1);
       await expect(this.nft.mint(1,[], {value: this.price})).to.be.revertedWith("NFT: Allow list only");
     });
+
+    it('enforces correct price in whitelist only state (1)', async function () {
+      const leaf = keccak256(this.wlAddresses[0])
+
+      const proof = this.merkleTree.getHexProof(leaf)
+
+      // value > price case
+      await expect(this.nft.connect(this.wl1).mint(1, proof, {value: this.price})).to.be.revertedWith("NFT: incorrect amount of ETH sent")
+
+      // value < price case
+      await expect(this.nft.connect(this.wl1).mint(1, proof, {value: '1'})).to.be.revertedWith("NFT: incorrect amount of ETH sent")
+    })
 
     it('allows whitelist mint when in state 1', async function () {
       const leaf = keccak256(this.wlAddresses[1]);
