@@ -3,7 +3,6 @@ pragma solidity ^0.8.9;
 
 import "./ERC721A.sol";
 import "./ReentrancyGuard.sol";
-import "./MerkleProof.sol";
 import "./Ownable.sol";
 contract NFT is ERC721A, Ownable, ReentrancyGuard {
 

@@ -58,8 +58,28 @@ const keccak256 = require("keccak256")
     })
 
     it('enforces max supply', async function () {
-      const expectedPrice = parseInt(this.price) * 11
-      await expect(this.nft.mint(0, 11, {value: expectedPrice.toString()})).to.be.revertedWith("NFT: exceeds max supply")
+      const currentSupply = (await this.nft.types(0)).currentCount
+      const maxSupply = (await this.nft.types(0)).maxSupply
+
+      // set amount to one more than max supply would allow
+      const amount = parseInt(maxSupply) - parseInt(currentSupply) + 1
+
+      const expectedPrice = parseInt(this.price) * amount
+
+      await expect(this.nft.mint(0, amount, {value: expectedPrice.toString()})).to.be.revertedWith("NFT: exceeds max supply")
+    })
+
+    it('correctly allows mints under max supply', async function () {
+      await this.nft.createType("No Hitters", this.price, 10)
+      const maxSupply = (await this.nft.types(1)).maxSupply
+
+      for(let i = 0; i < maxSupply; i++) {
+        //console.log((await this.nft.types(1)).currentCount, maxSupply)
+
+        this.nft.mint(1, 1, {value: this.price})
+      }
+
+      await expect(this.nft.mint(1, 1, {value: this.price})).to.be.revertedWith("NFT: exceeds max supply")
     })
 
   })
