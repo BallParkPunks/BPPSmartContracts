@@ -1,6 +1,6 @@
-const { expect } = require("chai");
-const {MerkleTree} = require("merkletreejs");
-const keccak256 = require("keccak256");
+const { expect } = require("chai")
+const {MerkleTree} = require("merkletreejs")
+const keccak256 = require("keccak256")
 
   describe("NFT", function () {
     this.beforeAll(async function() {
@@ -8,150 +8,90 @@ const keccak256 = require("keccak256");
        * @dev initialize wallet instances
        * act as users of smart contracts
        */
-      const [owner, addr2, addr3, addr4, addr5, addr6, addr7, wl1, wl2, wl3] = await ethers.getSigners();
-      this.owner = owner;
-      this.addr2 = addr2;
-      this.addr3 = addr3;
-      this.addr4 = addr4;
-      this.addr5 = addr5;
-      this.addr6 = addr6;
-      this.addr7 = addr7;
-      this.wl1 = wl1;
-      this.wl2 = wl2;
-      this.wl3 = wl3;
+      const [owner, addr2, addr3, addr4, addr5, addr6, addr7] = await ethers.getSigners()
+      this.owner = owner
+      this.addr2 = addr2
+      this.addr3 = addr3
+      this.addr4 = addr4
+      this.addr5 = addr5
+      this.addr6 = addr6
+      this.addr7 = addr7
 
-      this.wlAddresses = [this.wl1.address, this.wl2.address, this.wl3.address];
+      this.price = '10000000000000000'
+      this.baseURI = 'https://ballparkpunks.api/get_metadata?typeId='
 
-      this.leafNodes = this.wlAddresses.map(addr => keccak256(addr));
-      this.merkleTree = new MerkleTree(this.leafNodes, keccak256, {sortPairs: true});
-      this.root = this.merkleTree.getHexRoot();
+      this.NFT = await ethers.getContractFactory("NFT")
+      this.nft = await this.NFT.deploy('BallParkPunks', 'BPP', '10000000000000000', this.baseURI)
+      await this.nft.createType("Super Sluggers", this.price, 10)
+    })
 
-      this.price = '10000000000000000';
-      this.alPrice = '5000000000000000';
+    describe("Metadata", function () {
+      it('returns correct metadata', async function () {
+        await this.nft.mint(0, 1, {value: this.price})
+        const tokenId = 0
 
-      this.NFT = await ethers.getContractFactory("NFT");
-      this.nft = await this.NFT.deploy('Test NFT', 'TEST', 10000, '10000000000000000', '5000000000000000', 'http://ipfs.io/ipfs/qwefowiejfoaiwejf');
-    });
-
-  describe("Deployment", function () {
-    it('deploys correctly', async function () {
-      expect(await this.nft.name()).to.equal('Test NFT');
-      expect(await this.nft.symbol()).to.equal('TEST');
-      expect(await this.nft.maxSupply()).to.equal(10000);
-      expect(await this.nft.price()).to.equal('10000000000000000');
-      expect(await this.nft.alPrice()).to.equal('5000000000000000');
-      expect(await this.nft.owner()).to.equal(this.owner.address);
-    });
-
-    it('initializes state to closed', async function () {
-      await expect(this.nft.mint(1, [], {value: this.price})).to.be.revertedWith("Sale is closed");
-    });
-    
-  });
+        const tokenuri = await this.nft.tokenURI(tokenId)
+        await expect(tokenuri).to.equal(`${this.baseURI}${0}&tokenId=${tokenId}`)
+      })
+    })
 
   describe("Mint", async function () {
     it('allows public mint for correct price', async function () {
-      await this.nft.setState(2);
-      expect(await this.nft.mint(1,[],{value: this.price})).to.emit('Transfer');
-    });
-
-    it('enforces correct price in public state', async function () {
-      // value < price case
-      await expect(this.nft.mint(1,[],{value: 0})).to.be.revertedWith("NFT: incorrect amount of ETH sent");
-
-      // value > price case
-      await expect(this.nft.mint(1,[],{value: (parseInt(this.price) * 2).toString()})).to.be.revertedWith("NFT: incorrect amount of ETH sent");
+      expect(await this.nft.mint(0, 1, {value: this.price})).to.emit('Transfer')
     })
 
-    it('owner can add to whitelist', async function () {
-      await this.nft.setALRoot(this.root);
-      expect(await this.nft.alRoot()).to.equal(this.root);
-
-      const leaf = keccak256(this.wlAddresses[0]);
-
-      const proof = this.merkleTree.getHexProof(leaf);
-      expect(await this.nft.isAllowListed(this.wlAddresses[0], proof)).to.equal(true);
-    });
-
-    it('whitelisted address can mint for whitelist price', async function () {
-      const leaf = keccak256(this.wlAddresses[0]);
-
-      const proof = this.merkleTree.getHexProof(leaf);
-
-      expect(await this.nft.connect(this.wl1).mint(1, proof, {value: this.alPrice})).to.emit('Transfer');
-    });
-
-    it('enforces whitelist only when in state 1', async function () {
-      await this.nft.setState(1);
-      await expect(this.nft.mint(1,[], {value: this.price})).to.be.revertedWith("NFT: Allow list only");
-    });
-
-    it('enforces correct price in whitelist only state (1)', async function () {
-      const leaf = keccak256(this.wlAddresses[0])
-
-      const proof = this.merkleTree.getHexProof(leaf)
+    it('enforces correct price', async function () {
+      // value < price case
+      await expect(this.nft.mint(0,1,{value: 0})).to.be.revertedWith("NFT: incorrect amount of ETH sent")
 
       // value > price case
-      await expect(this.nft.connect(this.wl1).mint(1, proof, {value: this.price})).to.be.revertedWith("NFT: incorrect amount of ETH sent")
-
-      // value < price case
-      await expect(this.nft.connect(this.wl1).mint(1, proof, {value: '1'})).to.be.revertedWith("NFT: incorrect amount of ETH sent")
+      await expect(this.nft.mint(0,1,{value: (parseInt(this.price) * 2).toString()})).to.be.revertedWith("NFT: incorrect amount of ETH sent")
     })
-
-    it('allows whitelist mint when in state 1', async function () {
-      const leaf = keccak256(this.wlAddresses[1]);
-
-      const proof = this.merkleTree.getHexProof(leaf);
-
-      expect(await this.nft.connect(this.wl2).mint(1, proof, {value: this.alPrice})).to.emit('Transfer');
-    });
 
     it('allows owner/admin to increase max supply', async function () {
-      const increaseBy = 100
-      const beforeSupply = await this.nft.maxSupply()
+      const increaseBy = 1
+      const beforeSupply = (await this.nft.types(0)).maxSupply
 
-      await this.nft.increaseMaxSupply(increaseBy)
+      await this.nft.increaseMaxSupply(0, increaseBy)
 
-      expect(await this.nft.maxSupply()).to.equal(parseInt(beforeSupply) + increaseBy)
+      expect((await this.nft.types(0)).maxSupply).to.equal(parseInt(beforeSupply) + increaseBy)
     })
 
-  });
+    it('enforces max supply', async function () {
+      const expectedPrice = parseInt(this.price) * 11
+      await expect(this.nft.mint(0, 11, {value: expectedPrice.toString()})).to.be.revertedWith("NFT: exceeds max supply")
+    })
+
+  })
 
   describe('Security', async function () {
     it('does not allow non owner to call ownerMint', async function () {
-        await expect(this.nft.connect(this.addr2).ownerMint(1,this.addr2.address)).to.be.revertedWith('Ownable: caller is not the owner');
+        await expect(this.nft.connect(this.addr2).ownerMint(0, 1, this.addr2.address)).to.be.revertedWith('Ownable: caller is not the owner')
     })
 
     it('does not allow non owner to withdraw', async function () {
-        await expect(this.nft.connect(this.addr2).withdraw(1,this.addr2.address)).to.be.revertedWith('Ownable: caller is not the owner');
+        await expect(this.nft.connect(this.addr2).withdraw(1,this.addr2.address)).to.be.revertedWith('Ownable: caller is not the owner')
     })
 
     it('does not allow non owner/admin to set URI', async function () {
-        await expect(this.nft.connect(this.addr2).setURI('test URI')).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
-    })
-
-    it('does not allow non owner/admin to set state', async function () {
-        await expect(this.nft.connect(this.addr2).setState(1)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
-    })
-
-    it('does not allow non owner/admin to set alRoot', async function () {
-        await expect(this.nft.connect(this.addr2).setALRoot(this.root)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
+        await expect(this.nft.connect(this.addr2).setURI('test URI')).to.be.revertedWith('OnlyAdmin: sender is not admin or owner')
     })
 
     it('does not allow non owner to transfer ownership', async function () {
-      await expect(this.nft.connect(this.addr4).transferOwnership(this.addr4.address)).to.be.revertedWith('Ownable: caller is not the owner');
+      await expect(this.nft.connect(this.addr4).transferOwnership(this.addr4.address)).to.be.revertedWith('Ownable: caller is not the owner')
     })
 
     it('does not allow non owner/admin to set price', async function () {
-      await expect(this.nft.connect(this.addr4).setPrice(0)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
-    })
-
-    it('does not allow non owner/admin to set allow list price', async function () {
-      await expect(this.nft.connect(this.addr4).setALPrice(0)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
+      await expect(this.nft.connect(this.addr4).setPrice(0,0)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner')
     })
 
     it('does not allow non owner/admin to increase max supply', async function () {
-      await expect(this.nft.connect(this.addr4).increaseMaxSupply(1000)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner');
+      await expect(this.nft.connect(this.addr4).increaseMaxSupply(0, 1000)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner')
     })
-  });
-});
+
+    //createType(string calldata _name, uint256 _price, uint256 supply)
+    it('does not allow non owner/admin to create new type', async function () {
+      await expect(this.nft.connect(this.addr4).createType("Test Name", 0, 100)).to.be.revertedWith('OnlyAdmin: sender is not admin or owner')
+    })
+  })
+})

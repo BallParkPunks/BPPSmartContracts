@@ -6,8 +6,17 @@ import "./ReentrancyGuard.sol";
 import "./MerkleProof.sol";
 import "./Ownable.sol";
 contract NFT is ERC721A, Ownable, ReentrancyGuard {
-    // Max supply 
-    uint256 public maxSupply;
+
+    struct Type {
+        string name;            // ex. "Super Sluggers Pack"
+        uint256 typeId;         // ex. 0, 1, 2, etc.
+        uint256 price;          // ex. 50000000000000000000 (50 MATIC)
+        uint256 maxSupply;      // ex. 25
+        uint256 currentCount;   // ex. 14
+    }
+    Type[] public types;
+    mapping(uint256 => uint256) public token_type;
+    mapping(uint256 => uint256) public token_index;
 
     // Admin mapping
     mapping(address => bool) public isAdmin;
@@ -17,71 +26,56 @@ contract NFT is ERC721A, Ownable, ReentrancyGuard {
         _;
     }
 
-    // Merkle Root
-    bytes32 public alRoot;
-
     // Public and Allow-List Prices
     uint256 public price;
-    uint256 public alPrice;
-
-    // 0 - closed
-    // 1 - allow list only
-    // 2 - public
-    uint256 public state;
     
-    event minted(address minter, uint256 price, address recipient, uint256 amount);
+    event minted(address minter, uint256 typeId, uint256 price, uint256 amount);
     event stateChanged(uint256 _state);
 
     constructor (
-        string memory _name,     // 
-        string memory _symbol,   // 
-        uint256 _maxSupply,     // 
-        uint256 _price,         // 
-        uint256 _alPrice,        //
+        string memory _name,
+        string memory _symbol,
+        uint256 _price,
         string memory _uri
     ) 
     ERC721A(_name, _symbol) 
     {
-        maxSupply = _maxSupply;
         price = _price;
-        alPrice = _alPrice;
         URI = _uri;
 
         isAdmin[_msgSender()] = true;
-        _safeMint(_msgSender(), 1);
     }
 
-    function isAllowListed(address _recipient, bytes32[] calldata _merkleProof) public view returns(bool) {
-        bytes32 leaf = keccak256(abi.encodePacked(_recipient));
-        bool isal = MerkleProof.verify(_merkleProof, alRoot, leaf);
-        return isal;
-    }
+    function mint(uint256 typeId, uint256 amount) external payable nonReentrant {
+        require(types[typeId].currentCount + amount <= types[typeId].maxSupply, "NFT: exceeds max supply");
+        require(msg.value == types[typeId].price * amount, "NFT: incorrect amount of ETH sent");
 
-    function mint(uint256 amount, bytes32[] calldata _merkleProof) external payable nonReentrant {
-        require(state > 0, "Sale is closed");
-        require(totalSupply() + amount <= maxSupply, "NFT: exceeds max supply");
-
-        uint256 mintPrice = price;
-
-        if(state == 1) {
-            require(isAllowListed(_msgSender(), _merkleProof), "NFT: Allow list only");
-            mintPrice = alPrice;
-        } else if(state == 2) {
-            if(isAllowListed(_msgSender(), _merkleProof)) {
-                mintPrice = alPrice;
-            }
+        token_type[totalSupply()] = typeId;
+        token_index[totalSupply()] = types[typeId].currentCount;
+        
+        unchecked {
+            types[typeId].currentCount++;
         }
-
-        require(msg.value == mintPrice * amount, "NFT: incorrect amount of ETH sent");
         
         _safeMint(_msgSender(), amount);
-        emit minted(_msgSender(), msg.value, _msgSender(), amount);
+        emit minted(_msgSender(), typeId, msg.value, amount);
     }
 
-    function ownerMint(uint amount, address _recipient) external onlyOwner {
-        require(totalSupply() + amount <= maxSupply,  "exceeds max supply");
+    function ownerMint(uint256 typeId, uint amount, address _recipient) external onlyOwner {
+        require(types[typeId].currentCount + amount <= types[typeId].maxSupply, "NFT: exceeds max supply");
         _safeMint(_recipient, amount);
-        emit minted(_msgSender(), 0, _recipient, amount);
+        emit minted(_msgSender(), typeId, 0, amount);
+    }
+
+    function tokenURI(uint256 tokenId) public view override returns(string memory) {
+        if (!_exists(tokenId)) revert URIQueryForNonexistentToken();
+
+        string memory baseURI = _baseURI();
+        string memory typedURI = string(abi.encodePacked(baseURI, _toString(token_type[tokenId])));
+        string memory indexedURI = string(abi.encodePacked(typedURI, "&tokenId="));
+        string memory tokenUri = string(abi.encodePacked(indexedURI, _toString(token_index[tokenId])));
+
+        return tokenUri;
     }
 
     function withdraw(uint256 amount, address payable recipient) external onlyOwner {
@@ -93,29 +87,21 @@ contract NFT is ERC721A, Ownable, ReentrancyGuard {
         URI = _uri;
     }
 
-    function setState(uint256 _state) external onlyAdmin {
-        require(_state <= 2, "State can only be from 0 to 2, inclusive");
-        state = _state;
-        emit stateChanged(state);
-    }
-    
-    function setALRoot(bytes32 root) external onlyAdmin {
-        alRoot = root;
-    }
-
     function setAdmin(address _admin, bool _isAdmin) public onlyOwner {
         isAdmin[_admin] = _isAdmin;
     }
 
-    function setPrice(uint256 _price) external onlyAdmin {
-        price = _price;
+    function setPrice(uint256 typeId, uint256 _price) external onlyAdmin {
+        types[typeId].price = _price;
     }
 
-    function setALPrice(uint256 _alPrice) external onlyAdmin {
-        alPrice = _alPrice;
+    function increaseMaxSupply(uint256 typeId, uint256 _increaseBy) external onlyAdmin {
+        types[typeId].maxSupply += _increaseBy;
     }
 
-    function increaseMaxSupply(uint256 _increaseBy) external onlyAdmin {
-        maxSupply += _increaseBy;
+    function createType(string calldata _name, uint256 _price, uint256 supply) external onlyAdmin {
+        uint256 id = types.length;
+
+        types.push(Type(_name, id, _price, supply, 0));
     }
 }
