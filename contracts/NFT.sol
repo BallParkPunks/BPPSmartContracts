@@ -24,22 +24,16 @@ contract NFT is ERC721A, Ownable, ReentrancyGuard {
         require(isAdmin[_msgSender()] || _msgSender() == owner(), "OnlyAdmin: sender is not admin or owner");
         _;
     }
-
-    // Public and Allow-List Prices
-    uint256 public price;
     
     event minted(address minter, uint256 typeId, uint256 price, uint256 amount);
-    event stateChanged(uint256 _state);
 
     constructor (
-        string memory _name,
-        string memory _symbol,
-        uint256 _price,
-        string memory _uri
+        string memory _name,    // BallParkPunks
+        string memory _symbol,  // BPP
+        string memory _uri      // https://ballparkpunks.wl.r.appspot.com/get_metadata?typeId=
     ) 
     ERC721A(_name, _symbol) 
     {
-        price = _price;
         URI = _uri;
 
         isAdmin[_msgSender()] = true;
@@ -47,7 +41,7 @@ contract NFT is ERC721A, Ownable, ReentrancyGuard {
 
     function mint(uint256 typeId, uint256 amount) external payable nonReentrant {
         require(types[typeId].currentCount + amount <= types[typeId].maxSupply, "NFT: exceeds max supply");
-        require(msg.value == types[typeId].price * amount, "NFT: incorrect amount of ETH sent");
+        require(msg.value == getPrice(typeId, amount), "NFT: incorrect amount of ETH sent");
 
         token_type[totalSupply()] = typeId;
         token_index[totalSupply()] = types[typeId].currentCount;
@@ -60,8 +54,16 @@ contract NFT is ERC721A, Ownable, ReentrancyGuard {
         emit minted(_msgSender(), typeId, msg.value, amount);
     }
 
+    function getPrice(uint256 typeId, uint256 amount) public view returns(uint256) {
+        return types[typeId].price * amount;
+    }
+
     function ownerMint(uint256 typeId, uint amount, address _recipient) external onlyOwner {
         require(types[typeId].currentCount + amount <= types[typeId].maxSupply, "NFT: exceeds max supply");
+        
+        unchecked {
+            types[typeId].currentCount++;
+        }        
         _safeMint(_recipient, amount);
         emit minted(_msgSender(), typeId, 0, amount);
     }
